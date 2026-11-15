@@ -60,17 +60,33 @@ export default declare(api => {
           if (!node.id) {
             node.id = scope.generateUidIdentifier("target");
           } else {
-            // packages/babel-helper-create-class-features-plugin/src/fields.ts#L192 unshadow
+            const id = node.id;
+            const name = id.name;
+            const isFunctionExpression = func.isFunctionExpression();
+
+            // temporarily remove the function expression's name and rebuild local bindings
+            if (isFunctionExpression) {
+              node.id = null;
+              func.scope.crawl();
+            }
+
+            // rename local bindings that shadow the function name
             let scope = path.scope;
-            const name = node.id.name;
             while (scope !== func.parentPath.scope) {
               if (
                 scope.hasOwnBinding(name) &&
-                !scope.bindingIdentifierEquals(name, node.id)
+                !scope.bindingIdentifierEquals(name, id)
               ) {
                 scope.rename(name);
               }
               scope = scope.parent!;
+            }
+
+            // restore the function name and refresh scope bindings
+            node.id = id;
+
+            if (isFunctionExpression) {
+              func.scope.crawl();
             }
           }
 
